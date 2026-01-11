@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# External repos (submodules/clones)
+repos/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage/
+.nyc_output/
+test-results/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# LiteLLM config files
+litellm-*.yaml
+
+# Internal development notes
+notes/
+
+# Agent skills (personal)
+.agent/

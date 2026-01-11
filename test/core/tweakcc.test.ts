@@ -1,0 +1,215 @@
+/**
+ * Tweakcc Configuration Tests
+ */
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { ensureTweakccConfig } from '../../src/core/tweakcc.js';
+import { makeTempDir, cleanup } from '../helpers/index.js';
+
+test('ensureTweakccConfig returns false when no brandKey provided', () => {
+  const tweakDir = makeTempDir();
+  try {
+    const result = ensureTweakccConfig(tweakDir, null);
+    assert.equal(result, false);
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig returns false when brandKey is undefined', () => {
+  const tweakDir = makeTempDir();
+  try {
+    const result = ensureTweakccConfig(tweakDir, undefined);
+    assert.equal(result, false);
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig creates config file when it does not exist', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    const result = ensureTweakccConfig(tweakDir, 'zai');
+
+    assert.equal(result, true);
+    assert.ok(fs.existsSync(configPath));
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.ok(config.settings);
+    assert.ok(config.settings.themes);
+    assert.equal(config.settings.themes[0]?.id, 'zai-carbon');
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig creates minimax config', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    const result = ensureTweakccConfig(tweakDir, 'minimax');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.equal(config.settings.themes[0]?.id, 'minimax-pulse');
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig creates openrouter config', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    const result = ensureTweakccConfig(tweakDir, 'openrouter');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.equal(config.settings.themes[0]?.id, 'openrouter-teal');
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig creates ccrouter config', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    const result = ensureTweakccConfig(tweakDir, 'ccrouter');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.equal(config.settings.themes[0]?.id, 'ccrouter-sky');
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig returns false if config exists and is up to date', () => {
+  const tweakDir = makeTempDir();
+
+  try {
+    // First call creates the config
+    ensureTweakccConfig(tweakDir, 'zai');
+
+    // Second call should return false (no changes needed)
+    const result = ensureTweakccConfig(tweakDir, 'zai');
+    assert.equal(result, false);
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig updates config when themes differ', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    // Create initial config with different theme
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        settings: {
+          themes: [{ id: 'custom-theme', name: 'Custom Theme' }],
+        },
+      })
+    );
+
+    // Apply zai brand - should add brand theme to front
+    const result = ensureTweakccConfig(tweakDir, 'zai');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    // Brand theme should be first
+    assert.equal(config.settings.themes[0]?.id, 'zai-carbon');
+    // Custom theme should still be present
+    assert.ok(config.settings.themes.some((t: { id?: string }) => t.id === 'custom-theme'));
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig handles malformed JSON gracefully', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    // Create malformed JSON
+    fs.writeFileSync(configPath, '{ invalid json }');
+
+    // Should not throw, just return false
+    const result = ensureTweakccConfig(tweakDir, 'zai');
+    assert.equal(result, false);
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig removes legacy minimax themes', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    // Create config with legacy minimax themes
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        settings: {
+          themes: [
+            { id: 'minimax-pulse', name: 'MiniMax Pulse' },
+            { id: 'minimax-ember', name: 'MiniMax Ember' },
+            { id: 'minimax-glass', name: 'MiniMax Glass' },
+            { id: 'minimax-blade', name: 'MiniMax Blade' },
+          ],
+        },
+      })
+    );
+
+    const result = ensureTweakccConfig(tweakDir, 'minimax');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    // Legacy themes should be removed
+    assert.ok(!config.settings.themes.some((t: { id?: string }) => t.id === 'minimax-ember'));
+    assert.ok(!config.settings.themes.some((t: { id?: string }) => t.id === 'minimax-glass'));
+    assert.ok(!config.settings.themes.some((t: { id?: string }) => t.id === 'minimax-blade'));
+    // Primary theme should still be present
+    assert.ok(config.settings.themes.some((t: { id?: string }) => t.id === 'minimax-pulse'));
+  } finally {
+    cleanup(tweakDir);
+  }
+});
+
+test('ensureTweakccConfig updates userMessageDisplay when not set', () => {
+  const tweakDir = makeTempDir();
+  const configPath = path.join(tweakDir, 'config.json');
+
+  try {
+    // Create config without userMessageDisplay
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        settings: {
+          themes: [{ id: 'zai-carbon' }],
+        },
+      })
+    );
+
+    const result = ensureTweakccConfig(tweakDir, 'zai');
+
+    assert.equal(result, true);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    // Should have userMessageDisplay set
+    assert.ok(config.settings.userMessageDisplay);
+  } finally {
+    cleanup(tweakDir);
+  }
+});

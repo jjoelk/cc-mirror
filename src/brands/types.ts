@@ -1,0 +1,83 @@
+export interface Theme {
+  name: string;
+  id: string;
+  colors: Record<string, string>;
+}
+
+export interface ThinkingVerbsConfig {
+  format: string;
+  verbs: string[];
+}
+
+export interface ThinkingStyleConfig {
+  reverseMirror: boolean;
+  updateInterval: number;
+  phases: string[];
+}
+
+export type UserMessageBorderStyle =
+  | 'none'
+  | 'single'
+  | 'double'
+  | 'round'
+  | 'bold'
+  | 'singleDouble'
+  | 'doubleSingle'
+  | 'classic'
+  | 'topBottomSingle'
+  | 'topBottomDouble'
+  | 'topBottomBold';
+
+export interface UserMessageDisplayConfig {
+  format: string;
+  styling: string[];
+  foregroundColor: string | 'default';
+  backgroundColor: string | 'default' | null;
+  borderStyle: UserMessageBorderStyle;
+  borderColor: string;
+  paddingX: number;
+  paddingY: number;
+  fitBoxToContent: boolean;
+}
+
+export interface InputBoxConfig {
+  removeBorder: boolean;
+}
+
+export interface MiscConfig {
+  showTweakccVersion: boolean;
+  showPatchesApplied: boolean;
+  expandThinkingBlocks: boolean;
+  enableConversationTitle: boolean;
+  hideStartupBanner: boolean;
+  hideCtrlGToEditPrompt: boolean;
+  hideStartupClawd: boolean;
+  increaseFileReadLimit: boolean;
+}
+
+export interface Toolset {
+  name: string;
+  allowedTools: string[] | '*';
+  blockedTools?: string[];
+}
+
+export interface TweakccSettings {
+  themes: Theme[];
+  thinkingVerbs: ThinkingVerbsConfig;
+  thinkingStyle: ThinkingStyleConfig;
+  userMessageDisplay: UserMessageDisplayConfig;
+  inputBox: InputBoxConfig;
+  misc: MiscConfig;
+  toolsets: Toolset[];
+  defaultToolset: string | null;
+  planModeToolset: string | null;
+}
+
+export interface TweakccConfig {
+  ccVersion: string;
+  ccInstallationPath: string | null;
+  lastModified: string;
+  changesApplied: boolean;
+  settings: TweakccSettings;
+  hidePiebaldAnnouncement?: boolean;
+}

@@ -1,0 +1,20 @@
+{
+  "all": true,
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "src/**/*.d.ts",
+    "src/**/types.ts",
+    "src/cli/index.ts",
+    "src/cli/tui.ts",
+    "src/tui/index.tsx",
+    "src/tui/state/**",
+    "src/tui/router/**",
+    "dist/**",
+    "test/**"
+  ],
+  "reporter": ["text", "html", "lcov"],
+  "lines": 75,
+  "functions": 70,
+  "branches": 70,
+  "checkCoverage": true
+}
