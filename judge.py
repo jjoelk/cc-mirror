@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Conductor Consensus - Multi-agent session analysis
+Judge - Multi-agent codebase analysis
 
 Usage:
-    python3 judge.py                          # Analyze most recent session
-    python3 judge.py "is this secure?"        # With specific question
-    python3 judge.py --workers skeptic,security "check for vulns"
-    python3 judge.py --list                   # List sessions
-    python3 judge.py --help                   # Show help
+    python3 judge.py "how does auth work?"       # Deep research
+    python3 judge.py "review code quality"       # Code review
+    python3 judge.py "find potential bugs"       # Bug hunting
+    python3 judge.py "check the architecture"    # Architecture review
+    python3 judge.py --list                      # List sessions
+    python3 judge.py --help                      # Show help
 """
 
 import argparse
@@ -24,6 +25,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+# Try to import rich for beautiful markdown rendering
+try:
+    from rich.console import Console
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.style import Style
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
 
 # ANSI colors
 GREEN = "\033[32m"
@@ -53,6 +64,25 @@ VERDICT_ICONS = {
 
 # Spinner frames
 SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
+def render_markdown(text: str, title: str = None):
+    """Render markdown beautifully in terminal using rich, or fallback to plain text."""
+    if RICH_AVAILABLE:
+        console = Console()
+        md = Markdown(text)
+        if title:
+            panel = Panel(md, title=f"[bold cyan]{title}[/bold cyan]", border_style="cyan")
+            console.print(panel)
+        else:
+            console.print(md)
+    else:
+        # Fallback: basic formatting without rich
+        if title:
+            print(f"\n{BOLD}{CYAN}╭─ {title} {'─' * (50 - len(title))}╮{RESET}")
+        print(text)
+        if title:
+            print(f"{CYAN}╰{'─' * 56}╯{RESET}")
 
 
 class LiveDisplay:
@@ -198,27 +228,32 @@ def parse_activity_from_output(line: str) -> Optional[str]:
     return None
 
 # General investigation prompt - let the model use its own personality
-GENERAL_PROMPT = """Investigate this Claude Code conversation and verify the claims made.
+GENERAL_PROMPT = """Analyze this Claude Code conversation and answer the question below.
+
+## QUESTION
 {question}
 
 ## YOUR TOOLS
-You have FULL access to: Read, Grep, Glob, Bash. USE THEM to verify claims.
+You have FULL access to: Read, Grep, Glob, Bash. USE THEM to explore the codebase.
 
-## TASK
-1. Read the conversation below
-2. Identify key claims, file paths, and code references
-3. Actually READ the files mentioned - verify claims are true
-4. Search for related code that might have been missed
-5. Give your honest assessment
+## WHAT YOU CAN DO
+- **Code Quality**: Review structure, patterns, readability, maintainability
+- **Deep Research**: Explore how things work, trace through the codebase
+- **Architecture**: Analyze design decisions, dependencies, data flow
+- **Bug Hunting**: Find issues, edge cases, potential problems
+- **General Questions**: Answer anything about the code or conversation
 
 ## CONVERSATION
 ---
 {context}
 ---
 
-## OUTPUT
-First, show your investigation (read files, search code, verify claims).
-Then end with this JSON:
+## HOW TO RESPOND
+1. Use your tools to actually explore the codebase (don't just guess)
+2. Show your investigation process
+3. Give your honest assessment based on what you find
+
+End with this JSON:
 {{"verdict": "approve|reject|concern|neutral", "confidence": <0-100>, "summary": "<your findings>", "concerns": ["<issue 1>", "<issue 2>"], "recommendations": ["<suggestion>"]}}"""
 
 
@@ -1165,14 +1200,12 @@ def print_verdict(consensus: Consensus, verdicts: list, verbose: bool = False, d
             print()
 
     # Jarvis-style synthesis (always shown)
-    print(f"{DIM}════════════════════════════════════════════════════════════{RESET}")
     print()
     if ai_synthesis:
-        print(f"{BOLD}{CYAN}JARVIS Synthesis:{RESET}\n")
-        print(ai_synthesis)
+        render_markdown(ai_synthesis, "JARVIS Synthesis")
     else:
         synthesis = synthesize_findings(question, verdicts, consensus)
-        print(synthesis)
+        render_markdown(synthesis, "Summary")
     print()
 
 
@@ -1181,22 +1214,23 @@ def main():
         description="Conductor Consensus - Multi-agent session analysis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Usage:
-  python3 judge.py                    # Auto-detects zai + minimax
-  python3 judge.py "check my work"    # With a specific question
-  python3 judge.py -m zai,minimax     # Specify models explicitly
+Examples:
+  python3 judge.py "how does auth work?"     # Deep research
+  python3 judge.py "review code quality"     # Code review
+  python3 judge.py "find bugs"               # Bug hunting
+  python3 judge.py --list                    # List sessions
+  python3 judge.py --clean                   # Clean up sessions
 
 What happens:
-  1. Each model investigates independently (reads files, verifies claims)
+  1. Each model investigates independently (reads files, explores code)
   2. Claude (Opus) synthesizes all findings into JARVIS summary
 
 Options:
   -m, --models        Models to use (default: auto-detect zai,minimax)
-  --synthesizer       Model for synthesis (default: claude)
-  --personality       Use role prompts (skeptic/auditor) instead of general
-  --live              Show live activity (spinner + elapsed time)
-  --no-synthesis      Skip Opus synthesis
+  --no-synthesis      Skip Opus synthesis (just raw model outputs)
   --list              List available sessions
+  --clean             Clean up sessions (with confirmation)
+  --clean-all         Clean ALL sessions without confirmation
         """,
     )
 
@@ -1214,6 +1248,8 @@ Options:
     parser.add_argument("--live", action="store_true", help="Show live worker activity")
     parser.add_argument("--sequential", action="store_true", help="Run workers sequentially (default: parallel)")
     parser.add_argument("--no-synthesis", action="store_true", help="Skip Opus synthesis")
+    parser.add_argument("--clean", action="store_true", help="Clean up sessions for this project")
+    parser.add_argument("--clean-all", action="store_true", help="Clean ALL sessions without confirmation")
     parser.add_argument("--bin-dir", default=str(Path.home() / ".local" / "bin"), help="Variant bin directory")
 
     args = parser.parse_args()
@@ -1288,11 +1324,76 @@ Options:
         for s in sessions[:20]:
             from datetime import datetime
             dt = datetime.fromtimestamp(s["modified"])
-            print(f"  {s['id'][:8]}...  {dt.strftime('%Y-%m-%d %H:%M')}")
+            size_kb = s["size"] / 1024
+            print(f"  {s['id'][:8]}...  {dt.strftime('%Y-%m-%d %H:%M')}  ({size_kb:.1f} KB)")
 
         if len(sessions) > 20:
             print(f"  ... and {len(sessions) - 20} more")
         print()
+        return
+
+    # Clean mode - only delete small sessions (likely judge leftovers, not real work)
+    if args.clean or args.clean_all:
+        sessions_dir = get_sessions_dir(args.project)
+        if not sessions_dir.exists():
+            print(f"No sessions directory found for: {args.project}")
+            return
+
+        all_sessions = list_sessions(args.project, min_size=0)
+        if not all_sessions:
+            print(f"No sessions found for: {args.project}")
+            return
+
+        # Separate small sessions (likely judge) from large ones (likely real work)
+        # 10KB threshold - real work sessions are usually much larger
+        SMALL_THRESHOLD = 10 * 1024  # 10 KB
+        small_sessions = [s for s in all_sessions if s["size"] < SMALL_THRESHOLD]
+        large_sessions = [s for s in all_sessions if s["size"] >= SMALL_THRESHOLD]
+
+        from datetime import datetime
+
+        if large_sessions:
+            print(f"\n{BOLD}Real work sessions (KEPT):{RESET}\n")
+            for s in large_sessions:
+                dt = datetime.fromtimestamp(s["modified"])
+                size_kb = s["size"] / 1024
+                print(f"  {GREEN}✓{RESET} {s['id'][:8]}...  {dt.strftime('%Y-%m-%d %H:%M')}  ({size_kb:.1f} KB)")
+
+        if small_sessions:
+            print(f"\n{BOLD}Small sessions (to delete):{RESET}\n")
+            total_size = 0
+            for s in small_sessions:
+                dt = datetime.fromtimestamp(s["modified"])
+                size_kb = s["size"] / 1024
+                total_size += s["size"]
+                print(f"  {RED}✗{RESET} {s['id'][:8]}...  {dt.strftime('%Y-%m-%d %H:%M')}  ({size_kb:.1f} KB)")
+
+            print(f"\n  {BOLD}Total: {len(small_sessions)} small sessions, {total_size / 1024:.1f} KB{RESET}\n")
+
+            if args.clean_all:
+                confirm = True
+            else:
+                try:
+                    response = input(f"Delete {len(small_sessions)} small sessions? [y/N]: ").strip().lower()
+                    confirm = response in ("y", "yes")
+                except (KeyboardInterrupt, EOFError):
+                    print("\nCancelled.")
+                    return
+
+            if confirm:
+                deleted = 0
+                for s in small_sessions:
+                    try:
+                        s["path"].unlink()
+                        deleted += 1
+                    except Exception as e:
+                        print(f"{RED}Failed to delete {s['id'][:8]}: {e}{RESET}")
+
+                print(f"{GREEN}Deleted {deleted} small sessions. Real work sessions preserved.{RESET}")
+            else:
+                print("Cancelled.")
+        else:
+            print(f"\n{GREEN}No small sessions to clean up.{RESET}")
         return
 
     # Get session
@@ -1317,6 +1418,10 @@ Options:
         sys.exit(1)
 
     context = extract_context(messages)
+
+    # Track existing sessions (so we can clean up new ones later)
+    existing_session_ids = {s["id"] for s in sessions}
+    analyzed_session_id = session["id"]
 
     # Progress
     if not args.json:
@@ -1400,6 +1505,26 @@ Options:
 
     # Output
     print_verdict(consensus, verdicts, verbose=args.verbose, debug=args.debug, as_json=args.json, question=question, ai_synthesis=ai_synthesis)
+
+    # Auto-cleanup: Delete sessions created during this run (but keep the one we analyzed)
+    if not args.json:
+        new_sessions = list_sessions(args.project, min_size=0)
+        sessions_to_delete = [
+            s for s in new_sessions
+            if s["id"] not in existing_session_ids and s["id"] != analyzed_session_id
+        ]
+
+        if sessions_to_delete:
+            deleted = 0
+            for s in sessions_to_delete:
+                try:
+                    s["path"].unlink()
+                    deleted += 1
+                except Exception:
+                    pass
+
+            if deleted > 0:
+                print(f"{DIM}Cleaned up {deleted} judge session(s).{RESET}")
 
 
 if __name__ == "__main__":
